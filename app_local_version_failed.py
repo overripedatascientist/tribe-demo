@@ -1,12 +1,10 @@
 from typing import Optional
 import streamlit as st
 import json
-import os
-import requests
 from dotenv import load_dotenv
-from pprint import pprint
+from langflow.load import run_flow_from_json
 
-from settings import CONF_FILE, LANGFLOW_TWEAKS, COUNTRIES, AGE_GROUPS, PLATFORMS, TRIBES
+from settings import CONF_FILE, LANGFLOW_TWEAKS, COUNTRIES, AGE_GROUPS, PLATFORMS, TRIBES, LANGFLOW_JSON_FILE
 
 load_dotenv(".env")
 
@@ -48,7 +46,6 @@ add_custom_css()
 # Function to update tweaks with user inputs
 def update_tweaks_with_user_input(
         tweaks: dict,
-        chat_input: str,
         tribe: Optional[int] = None,
         age_group: Optional[str] = None,
         country: Optional[str] = None,
@@ -57,31 +54,22 @@ def update_tweaks_with_user_input(
         min_follower_count: Optional[str] = None,
         min_likes_count: Optional[str] = None):
 
-    if not 'ChatInput-nM66I' in tweaks:
-        tweaks['ChatInput-nM66I'] = {}
-    tweaks['ChatInput-nM66I']['input_value'] = chat_input
-
     if tribe and tribe != "":
-        tweaks['TextInput-n0QkP'] = {}
         tweaks['TextInput-n0QkP']['input_value'] = tribe
 
     if age_group and age_group != "":
-        tweaks['TextInput-4wKnt'] = {}
         tweaks['TextInput-4wKnt']['input_value'] = age_group  # Age group filter
 
     if country and country != "":
-        tweaks['TextInput-wg8O0'] = {}
         tweaks['TextInput-wg8O0']['input_value'] = country  # Country filter
 
     if gender and gender != "":
-        tweaks['TextInput-WCBMY'] = {}
         tweaks['TextInput-WCBMY']['input_value'] = gender
 
     if min_follower_count and min_follower_count != "":
         tweaks['TextInput-UhThw']['input_value'] = min_follower_count  # Minimum follower count
 
     if min_likes_count and min_likes_count:
-        tweaks['TextInput-P1BmY'] = {}
         tweaks['TextInput-P1BmY']['input_value'] = min_likes_count  # Minimum likes count
 
     tweaks['TextInput-JZobh'] = {}
@@ -93,84 +81,31 @@ def update_tweaks_with_user_input(
 # Function to extract message from the response
 def extract_message(response: dict):
     try:
-        # First try to get chat output
-        if 'outputs' in response and response['outputs']:
-            for output in response['outputs']:
-                if 'message' in output:
-                    return output['message']['text']
-
-        # Fallback to your original extraction method
-        message_text = response['outputs'][0]['outputs'][0]['results']['message']['data']['text']
+        # The structure might be different for local execution
+        message_text = response['text']
         return message_text
-    except (KeyError, IndexError, TypeError) as e:
+    except (KeyError, AttributeError) as e:
         st.error(f"Error extracting message: {e}")
         st.write("Full Response:", response)
         return f"Error: Unable to extract message from the response."
 
 
+
 # Function to run flow with Streamlit inputs
-def run_flow(message: str,
-             tweaks: dict,
-             config: dict,
-             output_type: str = "chat",
-             input_type: str = "chat"):
+def run_flow(message: str, tweaks: dict,):
     """
-    Run a flow with a given message and optional tweaks.
+    Run a flow locally with a given message and optional tweaks.
     """
-    BASE_API_URL = "https://api.langflow.astra.datastax.com"
-    langflow_id = config['langflow_id']
-    flow_id = config['flow_id']
-    api_url = f"{BASE_API_URL}/lf/{langflow_id}/api/v1/run/{flow_id}"
-
-    payload = {
-        "inputs": {
-            "ChatInput-nM66I": {
-                "input_value": message
-            }
-        },
-        "output_type": output_type,
-        "input_type": input_type,
-        "tweaks": tweaks
-    }
-
-    pprint(tweaks)
-
-    # Get token from environment variable
-    application_token = os.getenv('ASTRA_DB_VECTOR_TOKEN')
-    if not application_token:
-        st.error("ASTRA_DB_VECTOR_TOKEN not found in environment variables")
-        return None
-
-    # Ensure proper header format
-    headers = {
-        "Authorization": f"Bearer {application_token}",
-        "Content-Type": "application/json"
-    }
-
     try:
-        response = requests.post(api_url, json=payload, headers=headers, timeout=60)
-        response.raise_for_status()  # Raise an exception for bad status codes
-
-        # Only try to parse JSON if we have content
-        if response.content:
-            try:
-                result = response.json()
-                st.write("API Response:", result)
-
-                if 'error' in result:
-                    st.error(f"API Error: {result['error']}")
-                    return None
-                return result
-            except json.JSONDecodeError as e:
-                st.error(f"Failed to parse API response as JSON: {str(e)}")
-                st.write("Raw response:", response.text)
-                return None
-        else:
-            st.error("Empty response received from API")
-            return None
-
-    except requests.exceptions.RequestException as e:
-        st.error(f"API request failed: {str(e)}")
+        result = run_flow_from_json(
+            flow=LANGFLOW_JSON_FILE,
+            input_value=message,
+            tweaks=tweaks,
+            fallback_to_env_vars=True
+        )
+        return result
+    except Exception as e:
+        st.error(f"Error running flow: {str(e)}")
         return None
 
 
@@ -270,7 +205,6 @@ if submitted and user_message:
     tweaks = LANGFLOW_TWEAKS.copy()
     tweaks = update_tweaks_with_user_input(
         tweaks,
-        chat_input=user_message,
         tribe=TRIBES[selected_tribe],
         age_group=AGE_GROUPS[selected_age_group],
         country=COUNTRIES[selected_country],
@@ -279,7 +213,7 @@ if submitted and user_message:
     )
 
     # Call the run_flow function and get the response
-    response = run_flow(user_message, tweaks=tweaks, config=config)
+    response = run_flow(user_message, tweaks=tweaks)
 
     # Extract and display only the message part
     extracted_message = extract_message(response)

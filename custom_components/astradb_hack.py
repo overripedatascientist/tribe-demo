@@ -75,6 +75,13 @@ class AstraVectorStoreComponent(LCVectorStoreComponent):
             advanced=True,
         ),
         IntInput(
+            name="custom_search_timeout_ms",
+            display_name="Custom Search Timeout (Milliseconds)",
+            info="Maximum time to wait for custom search results in milliseconds",
+            advanced=True,
+            value=1000
+        ),
+        IntInput(
             name="batch_size",
             display_name="Batch Size",
             info="Optional number of data to process in a single batch.",
@@ -315,7 +322,7 @@ class AstraVectorStoreComponent(LCVectorStoreComponent):
 
     @retry(
         stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=4, max=20),
+        wait=wait_exponential(multiplier=1, min=1, max=5),
         before_sleep=before_sleep_log(logger, WARNING),
         retry_error_callback=lambda x: logger.warning(f"Attempt {x.attempt_number} failed.")
     )
@@ -391,9 +398,10 @@ class AstraVectorStoreComponent(LCVectorStoreComponent):
                         limit=k,
                         include_similarity=True,
                         projection={"*": True},
-                        max_time_ms=20000
+                        max_time_ms=self.custom_search_timeout_ms
                     )
-                    docs = [Document(page_content=doc['$vectorize'], metadata=doc['metadata']) for doc in results]
+                    docs = [Document(page_content=doc['$vectorize'], metadata=doc['metadata']) for doc in results
+                            if doc['$similarity'] >= score_threshold]
                 else:
                     raise ValueError(f"Unknown search_type: {search_type}")
 
