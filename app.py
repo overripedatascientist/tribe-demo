@@ -1,3 +1,4 @@
+from platform import platform
 from typing import Optional
 import streamlit as st
 import json
@@ -53,6 +54,7 @@ def update_tweaks_with_user_input(
         age_group: Optional[str] = None,
         country: Optional[str] = None,
         gender: Optional[str] = None,
+        platform: Optional[str] = None,
         rag_query: Optional[str] = None,
         min_follower_count: Optional[str] = None,
         min_likes_count: Optional[str] = None):
@@ -76,6 +78,10 @@ def update_tweaks_with_user_input(
     if gender and gender != "":
         tweaks['TextInput-WCBMY'] = {}
         tweaks['TextInput-WCBMY']['input_value'] = gender
+
+    if platform and platform != "":
+        tweaks['TextInput-aYfSJ'] = {}
+        tweaks['TextInput-aYfSJ']['input_value'] = platform
 
     if min_follower_count and min_follower_count != "":
         tweaks['TextInput-UhThw']['input_value'] = min_follower_count  # Minimum follower count
@@ -227,7 +233,6 @@ selected_age_group = st.sidebar.selectbox(
 )
 
 # Country selection
-# Age Group Selection
 selected_country = st.sidebar.selectbox(
     label="Select Market",
     options=list(COUNTRIES.keys()),  # Display pretty labels
@@ -235,11 +240,13 @@ selected_country = st.sidebar.selectbox(
     help="Select a geographic focus."
 )
 
-# TODO follower selection
-# TODO platform selection
-# TODO datetime_from selection YYYY-MM
-
-# TODO set the RAG query separately to the chat input, ["TextInput-JZobh"]["input_value"]
+# Platform selection
+selected_platform = st.sidebar.selectbox(
+    label="Select Platform",
+    options=list(PLATFORMS.keys()),
+    index=0,
+    help="Select a social media platform."
+)
 
 # New free-text input
 rag_query = st.sidebar.text_input(
@@ -275,6 +282,7 @@ if submitted and user_message:
         age_group=AGE_GROUPS[selected_age_group],
         country=COUNTRIES[selected_country],
         gender=selected_gender,
+        platform=PLATFORMS[selected_platform],
         rag_query=rag_query
     )
 

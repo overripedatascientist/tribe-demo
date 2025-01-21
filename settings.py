@@ -45,10 +45,10 @@ COUNTRIES = {
 
 PLATFORMS = {
   "All": "",
-  "TikTok": "",
-  "Facebook": "",
-  "YouTube": "",
-  "X": ""
+  "TikTok": "TikTok",
+  "Facebook": "Facebook",
+  "YouTube": "YouTube",
+  "X": "Twitter"
 }
 
 # LANGFLOW_TWEAKS = {
